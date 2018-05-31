@@ -2,90 +2,162 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class SlingShotCtrl : MonoBehaviour {
+public class SlingShotCtrl : MonoBehaviour
+{
     public GameObject mHead;
     public Transform mHead_L, mHead_R;
     public Transform mHead_lookAt;
+    private bool isHeadGrabbed = false;
     public Transform[] mLJoints, mRJoints;
     private int numJoints;
+    private Vector3 pHeadPosition;
 
     public float mSpringRestLength = 0.15f;
     public float mSpringMinLength = 0.1f;
     public float mSpringMaxLength = 0.3f;
+
+
+    public float mSpringStiffness = 1.2f;
     public float mGravity = -0.98f;
 
+    private Particle mHeadPoint;
     private Particle[] mLPoints, mRPoints;
-    private Spring[] mFLSprings, mFRSprings, mBLSprings, mBRSprings;
+    private Spring[] mFLSprings, mFRSprings;
 
-    void Start () {
+    void Start()
+    {
         initResource();
     }
-	
-	void Update () {
+
+    void Update()
+    {
         updateSpring();
-        fixPoint();
+        TODO_fixPoint();
+
         updateJoint();
+
+        pHeadPosition = mHeadPoint.position;
     }
 
-    void fixPoint()
+    void TODO_fixPoint()
     {
+        // fix anchor points to slingshot's body 
         mLPoints[0].position = mLJoints[0].position;
         mRPoints[0].position = mRJoints[0].position;
 
-        mLPoints[numJoints-1].position = mHead_L.position;
-        mRPoints[numJoints-1].position = mHead_R.position;
+        // calc head's drag force
+        {
+            Vector3 dir = pHeadPosition - mHeadPoint.position;
+            float mag = dir.magnitude;
+            dir.Normalize();
+
+            Vector3 f = dir * mag * 10f;
+            mHeadPoint.applyForce(f);
+
+            // update shader event
+            float illum = mag * 200f;
+            mHead.GetComponent<MeshRenderer>().sharedMaterial.SetFloat("_Emission", illum);
+            mHead.GetComponent<MeshRenderer>().sharedMaterial.SetVector("_EmissionColor", f);
+        }
+
+        // clamp headpoint's total length
+        {
+            //float totalLength = mSpringMaxLength * numJoints;
+            //Vector3 dir = mHeadPoint.position - mLJoints[0].position;
+            //float length = dir.magnitude;
+            //if (length > totalLength)
+            //{
+            //    dir.Normalize();
+            //    mHeadPoint.position = mLJoints[0].position + dir * totalLength;
+            //}
+            //dir = mHeadPoint.position - mRJoints[0].position;
+            //length = dir.magnitude;
+            //if (length > totalLength)
+            //{
+            //    dir.Normalize();
+            //    mHeadPoint.position = mRJoints[0].position + dir * totalLength;
+            //}
+        }
+
+
+        // apply head point to head object
+        isHeadGrabbed = mHead.GetComponent<SelfCollisionCheck>().checkCollision;
+
+        if (!isHeadGrabbed)
+        {
+            mHead.transform.position = mHeadPoint.position;
+        }
+        else
+        {
+            mHeadPoint.position = mHead.transform.position;
+        }
 
         // update head rotation
-        // -z
-        Vector3 dir = mHead.transform.position - mHead_lookAt.position;
-        dir.Normalize();
+        // - z
+        {
+            Vector3 dir = mHead.transform.position - mHead_lookAt.position;
+            dir.Normalize();
 
-        Vector3 rand = Vector3.up;
-        if (Mathf.Abs(Vector3.Dot(dir, rand)) == 1f)
-            rand = -Vector3.forward;
+            Vector3 rand = Vector3.up;
+            if (Mathf.Abs(Vector3.Dot(dir, rand)) == 1f)
+                rand = -Vector3.forward;
 
-        Vector3 left = Vector3.Cross(dir, rand);
-        left.Normalize();
-        Vector3 up = Vector3.Cross(left, dir);
-        up.Normalize();
+            Vector3 left = Vector3.Cross(dir, rand);
+            left.Normalize();
+            Vector3 up = Vector3.Cross(left, dir);
+            up.Normalize();
 
-        mHead.transform.rotation = Quaternion.LookRotation(dir, up);
+            mHead.transform.rotation = Quaternion.LookRotation(dir, up);
+        }
     }
 
     void updateSpring()
     {
         for (int i = 0; i < numJoints - 1; i++)
         {
-            // update spring and apply f to the point
+            // update spring variables
             {
-                mFLSprings[i].applyForce(ref mLPoints[i + 1], ref mLPoints[i]);
-                mFRSprings[i].applyForce(ref mRPoints[i + 1], ref mRPoints[i]);
+                mFLSprings[i].stiffness = mSpringStiffness;
+                mFRSprings[i].stiffness = mSpringStiffness;
 
-                mBLSprings[i].applyForce(ref mLPoints[numJoints - 2 - i], ref mLPoints[numJoints - 1 - i]);
-                mBRSprings[i].applyForce(ref mRPoints[numJoints - 2 - i], ref mRPoints[numJoints - 1 - i]);
+                mFLSprings[i].restLength = mSpringRestLength;
+                mFRSprings[i].restLength = mSpringRestLength;
+
+                mFLSprings[i].minLength = mSpringMinLength;
+                mFRSprings[i].minLength = mSpringMinLength;
+
+                mFLSprings[i].maxLength = mSpringMaxLength;
+                mFRSprings[i].maxLength = mSpringMaxLength;
             }
 
-            // constrain length
+            // update spring and apply f to the point
             {
-                mFLSprings[i].constrainLength(ref mLPoints[i + 1], mSpringMinLength, mSpringMaxLength);
-                mFRSprings[i].constrainLength(ref mRPoints[i + 1], mSpringMinLength, mSpringMaxLength);
-
-                mBLSprings[i].constrainLength(ref mLPoints[numJoints - 2 - i], mSpringMinLength, mSpringMaxLength);
-                mBRSprings[i].constrainLength(ref mRPoints[numJoints - 2 - i], mSpringMinLength, mSpringMaxLength);
+                if (i < numJoints - 2)
+                {
+                    mFLSprings[i].applyForce(ref mLPoints[i + 1], ref mLPoints[i]);
+                    mFRSprings[i].applyForce(ref mRPoints[i + 1], ref mRPoints[i]);
+                }
+                else
+                {
+                    mFLSprings[i].applyForce(ref mHeadPoint, ref mLPoints[i]);
+                    mFRSprings[i].applyForce(ref mHeadPoint, ref mRPoints[i]);
+                }
             }
 
             // update points
-            // without first and last points
+            // without first fixed points on slingshot's body
             if (i > 0)
             {
                 mLPoints[i].applyForce(mGravity);
                 mRPoints[i].applyForce(mGravity);
 
-                // update point's position
                 mLPoints[i].update();
                 mRPoints[i].update();
             }
         }
+        // update shared tip point
+        mHeadPoint.applyForce(mGravity);
+        mHeadPoint.update();
     }
 
     void updateJoint()
@@ -94,8 +166,16 @@ public class SlingShotCtrl : MonoBehaviour {
         {
             // update loc
             {
-                mLJoints[i].position = mLPoints[i].position;
-                mRJoints[i].position = mRPoints[i].position;
+                if (i != numJoints - 1)
+                {
+                    mLJoints[i].position = mLPoints[i].position;
+                    mRJoints[i].position = mRPoints[i].position;
+                }
+                else
+                {
+                    mLJoints[i].position = mHeadPoint.position;
+                    mRJoints[i].position = mHeadPoint.position;
+                }
             }
 
             // update rot
@@ -106,7 +186,7 @@ public class SlingShotCtrl : MonoBehaviour {
                 Vector3 up = Vector3.zero;
 
                 // *** axis of joints face -z
-                dir = (i != numJoints - 1) ? mLJoints[i].position - mLJoints[i + 1].position : mLJoints[i-1].position - mLJoints[i].position;
+                dir = (i != numJoints - 1) ? mLJoints[i].position - mLJoints[i + 1].position : mLJoints[i - 1].position - mLJoints[i].position;
                 dir.Normalize();
 
                 rand = Vector3.up;
@@ -142,30 +222,29 @@ public class SlingShotCtrl : MonoBehaviour {
     {
         numJoints = mLJoints.Length;
 
-        mLPoints = new Particle[numJoints];
-        mRPoints = new Particle[numJoints];
+        mLPoints = new Particle[numJoints - 1];
+        mRPoints = new Particle[numJoints - 1];
 
-        mFLSprings = new Spring[numJoints-1];
-        mFRSprings = new Spring[numJoints-1];
-
-        mBLSprings = new Spring[numJoints-1];
-        mBRSprings = new Spring[numJoints-1];
+        mFLSprings = new Spring[numJoints - 1];
+        mFRSprings = new Spring[numJoints - 1];
 
         // initialize objects
-        for (int i = 0; i < numJoints; i++)
         {
-            // points
-            mLPoints[i] = (i != numJoints - 1) ? new Particle(mLJoints[i].position) : mLPoints[i] = new Particle(mHead_L.position);
-            mRPoints[i] = (i != numJoints - 1) ? new Particle(mRJoints[i].position) : mLPoints[i] = new Particle(mHead_R.position);
+            // head point for slingshot head
+            // this will be the shared tip point for both joints
+            mHeadPoint = new Particle(mHead.transform.position);
 
-            // springs
-            if (i < numJoints - 1)
+            for (int i = 0; i < numJoints - 1; i++)
             {
-                mFLSprings[i] = new Spring(mLPoints[i].position, mSpringRestLength);
-                mFRSprings[i] = new Spring(mRPoints[i].position, mSpringRestLength);
+                // points
+                mLPoints[i] = new Particle(mLJoints[i].position);
+                mRPoints[i] = new Particle(mRJoints[i].position);
 
-                mBLSprings[i] = new Spring(mLPoints[numJoints - 1 - i].position, mSpringRestLength);
-                mBRSprings[i] = new Spring(mRPoints[numJoints - 1 - i].position, mSpringRestLength);
+                // springs
+                {
+                    mFLSprings[i] = new Spring(mLPoints[i].position, mSpringRestLength);
+                    mFRSprings[i] = new Spring(mRPoints[i].position, mSpringRestLength);
+                }
             }
         }
     }

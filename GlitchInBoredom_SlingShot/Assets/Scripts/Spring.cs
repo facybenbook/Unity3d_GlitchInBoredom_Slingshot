@@ -8,14 +8,43 @@ using UnityEngine;
 //
 struct Spring
 {
-    private const float K = 15f;
-    private float len;
+    private float K;
+    private float len, minLen, maxLen;
     private Vector3 anchor;
+
+
 
     public Spring(Vector3 anchor, float len)
     {
         this.anchor = anchor;
         this.len = len;
+        this.minLen = 0f;
+        this.maxLen = 999f;
+        this.K = 1.2f;
+    }
+
+    public float stiffness
+    {
+        get { return this.K; }
+        set { this.K = value; }
+    }
+
+    public float restLength
+    {
+        get { return this.len; }
+        set { this.len = value; }
+    }
+
+    public float minLength
+    {
+        get { return this.minLen; }
+        set { this.minLen = value; }
+    }
+
+    public float maxLength
+    {
+        get { return this.maxLen; }
+        set { this.maxLen = value; }
     }
 
     public void applyForce(ref Particle particle, ref Particle particle_anchor)
@@ -29,32 +58,5 @@ struct Spring
         particle.applyForce(f);
         f *= -1f;
         particle_anchor.applyForce(f);
-
-        // update anchor
-        this.anchor = particle_anchor.position;
-    }
-
-    public void constrainLength(ref Particle particle, float minlen, float maxlen)
-    {
-        Vector3 dir = particle.position - this.anchor;
-        float d = dir.magnitude;
-        dir.Normalize();
-
-        if (d < minlen)
-        {
-            dir *= minlen;
-            
-            // Reset position and stop from moving (not realistic physics)
-            particle.position = this.anchor + dir;
-            particle.velocity = Vector3.zero;
-        }
-        else if (d > maxlen)
-        {
-            dir *= maxlen;
-
-            // Reset position and stop from moving (not realistic physics)
-            particle.position = this.anchor + dir;
-            particle.velocity = Vector3.zero;
-        }
     }
 };
