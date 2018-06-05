@@ -1,0 +1,127 @@
+﻿#pragma kernel SetupRibbon
+#pragma kernel UpdateRibbon
+
+#include "Assets/Shaders/SimplexNoise3D.cginc"
+
+RWTexture2D<float4> oPosLife;
+RWTexture2D<float4> oVelScale;
+RWTexture2D<float4> oRotDir;
+
+Texture2D<float4> uPosLife;
+Texture2D<float4> uVelScale;
+
+bool uLaunchRibbon;
+float3 uLaunchOrigin;
+float3 uLaunchDir;
+float3 uLaunchSeed;
+float uTrailMaxLength;
+int uNumTrails;
+
+struct Particle 
+{
+	float3 pos;
+	float life;
+	float3 vel;
+	float scale;
+	float4 rotDir;
+};
+
+void launchRibbon(inout float3 pos, inout float3 vel, inout float life, inout float scale, in bool isHead) 
+{
+	pos = uLaunchOrigin + uLaunchSeed * .01;
+	vel = normalize(uLaunchDir * 2. + uLaunchSeed * .1);
+	vel *= isHead ? 3. : 1.;
+	life = 10.;
+	scale = isHead ? 3. : 1.;
+}
+
+void calcPullingForce(inout float3 pos, in float3 pullPos)
+{
+	float3 dir = pullPos - pos;
+	float dist = length(dir);
+	dir = normalize(dir);
+
+	if (dist > uTrailMaxLength)
+	{
+		pos += dir * (dist - uTrailMaxLength);
+	}
+}
+
+void calcRotDir(inout float4 rotDir, in float3 pos, in float3 pPos)
+{
+	float3 dir = normalize(pos - pPos);
+	rotDir = float4(dir, 1.);
+}
+
+void kill(uint3 id)
+{
+	oPosLife[id.xy] = float4(0., 0., 0., 0.);
+	oVelScale[id.xy] = float4(0., 0., 0., 0.);
+	oRotDir[id.xy] = float4(0., 0., 0., 0.);
+}
+
+[numthreads(8, 8, 1)]
+void SetupRibbon(uint3 id : SV_DispatchThreadID)
+{
+	kill(id);
+}
+
+[numthreads(8, 8, 1)]
+void UpdateRibbon(uint3 id : SV_DispatchThreadID)
+{
+	Particle p;
+
+	float4 d = uPosLife.Load(id, 0);
+	float3 pPos = d.xyz;
+	p.pos = pPos;
+	p.life = d.w;
+	d = uVelScale.Load(id, 0);
+	p.vel = d.xyz;
+	p.scale = d.w;
+
+	if (p.life < 0.1)
+	{
+		kill(id);
+		return;
+	}
+
+	// launch
+	if (uLaunchRibbon)
+	{
+		// head
+		if (id.y == 0)
+			launchRibbon(p.pos, p.vel, p.life, p.scale, true);
+		else
+			launchRibbon(p.pos, p.vel, p.life, p.scale, false);
+	}
+	
+	// pulling force
+	if (id.y != 0)
+	{
+		float3 pullPos = uPosLife.Load(id, 0).xyz;
+		calcPullingForce(p.pos, pullPos);
+	}
+
+	// gravity
+	p.vel -= .0098 * p.scale;
+
+	// clamp vel
+	p.vel = length(p.vel) > .1 ? normalize(p.vel) * .1 : p.vel;
+
+	// damping
+	p.vel *= .96;
+
+	// update position
+	float timeStep = .1;
+	p.pos += p.vel * timeStep;
+
+	// update life
+	p.life -= 0.1;
+
+	// update rotation vector
+	calcRotDir(p.rotDir, p.pos, pPos);
+
+	oPosLife[id.xy] = float4(p.pos, p.life);
+	oVelScale[id.xy] = float4(p.vel, p.scale);
+	oRotDir[id.xy] = p.rotDir;
+}

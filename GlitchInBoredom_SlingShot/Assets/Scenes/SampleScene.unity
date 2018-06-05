@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.27921078, g: 0.30264527, b: 0.32685426, a: 1}
+  m_IndirectSpecularColor: {r: 0.71506375, g: 0.7697056, b: 0.8265126, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -399,6 +399,7 @@ GameObject:
   - component: {fileID: 259707861}
   - component: {fileID: 259707855}
   - component: {fileID: 259707859}
+  - component: {fileID: 259707863}
   m_Layer: 0
   m_Name: SlingShot_rigged
   m_TagString: Untagged
@@ -546,6 +547,22 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &259707863
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 259707854}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9e1810eefc2cdc4a9bd0e2f3a55295a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mCs_updatePoints: {fileID: 7200000, guid: 29eeb9321fba347469b9bd8e5a7a0f09, type: 3}
+  mLaunchRibbon: 0
+  mTrailMaxLength: 0.1
+  mCs_generateMesh: {fileID: 7200000, guid: 60a24a7b049fe884687159a48cf78582, type: 3}
+  mRibbonShader: {fileID: 4800000, guid: c150f9df61eb5b749bd261ec5923a362, type: 3}
 --- !u!1 &271795095
 GameObject:
   m_ObjectHideFlags: 0
@@ -669,7 +686,7 @@ Prefab:
       objectReference: {fileID: 2100000, guid: bb8ba399e5f007247acd25975ec12228, type: 2}
     - target: {fileID: 143668, guid: e6ba3498ffa1e534b91a07264266e6b8, type: 2}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 479836, guid: e6ba3498ffa1e534b91a07264266e6b8, type: 2}
       propertyPath: m_LocalRotation.x
@@ -1172,7 +1189,7 @@ Prefab:
       objectReference: {fileID: 2100000, guid: bb8ba399e5f007247acd25975ec12228, type: 2}
     - target: {fileID: 195418, guid: ba1fa4a8c66106b4988c88fe4b8e8502, type: 2}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 456902, guid: ba1fa4a8c66106b4988c88fe4b8e8502, type: 2}
       propertyPath: m_LocalRotation.x
@@ -1495,7 +1512,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!81 &1839788744
 AudioListener:
   m_ObjectHideFlags: 0
@@ -1698,7 +1715,7 @@ Prefab:
       objectReference: {fileID: 0}
     - target: {fileID: 100004, guid: 126d619cf4daa52469682f85c1378b4a, type: 2}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_ParentPrefab: {fileID: 100100000, guid: 126d619cf4daa52469682f85c1378b4a, type: 2}

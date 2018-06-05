@@ -1,0 +1,102 @@
+﻿#pragma kernel InitMesh
+#pragma kernel GenerateMesh
+
+RWTexture2D<float4> oVert;
+RWTexture2D<float4> oNorm;
+RWTexture2D<float4> oTexCoord;
+RWTexture2D<float4> oTri;
+
+Texture2D<float4> uPosLife;
+Texture2D<float4> uVelScale;
+Texture2D<float4> uRotDir;
+
+int uNumTrails;
+int uNumRibbons;
+
+struct Particle 
+{
+	float3 pos;
+	float life;
+	float3 vel;
+	float scale;
+	float4 rotDir;
+};
+
+[numthreads(8, 8, 1)]
+void InitMesh(uint3 id : SV_DispatchThreadID)
+{
+	uint curIndex = id.x + id.y * uNumTrails;
+	uint vertIndex = curIndex * 2;
+
+	oVert[uint2(vertIndex, 0)] = float4(0, 0, 0, 0);
+	oNorm[uint2(vertIndex, 0)] = float4(0, 0, 0, 0);
+	oTexCoord[uint2(vertIndex, 0)] = float4(0, 0, 0, 0);
+
+	vertIndex++;
+
+	oVert[uint2(vertIndex, 0)] = float4(0, 0, 0, 0);
+	oNorm[uint2(vertIndex, 0)] = float4(0, 0, 0, 0);
+	oTexCoord[uint2(vertIndex, 0)] = float4(0, 0, 0, 0);
+
+	if (curIndex > 0)
+	{
+		uint triIndex = (curIndex - 1) * 6;
+
+		oTri[uint2(triIndex++, 0)] = float4(0, 0, 0, 0);
+		oTri[uint2(triIndex++, 0)] = float4(2, 0, 0, 0);
+		oTri[uint2(triIndex++, 0)] = float4(1, 0, 0, 0);
+
+		oTri[uint2(triIndex++, 0)] = float4(2, 0, 0, 0);
+		oTri[uint2(triIndex++, 0)] = float4(3, 0, 0, 0);
+		oTri[uint2(triIndex++, 0)] = float4(1, 0, 0, 0);
+	}
+}
+
+[numthreads(8, 8, 1)]
+void GenerateMesh(uint3 id : SV_DispatchThreadID)
+{
+	Particle p;
+
+	float4 d = uPosLife.Load(id, 0);
+	p.pos = d.xyz;
+	p.life = d.w;
+	d = uVelScale.Load(id, 0);
+	p.vel = d.xyz;
+	p.scale = d.w;
+	p.rotDir = uRotDir.Load(id, 0);
+
+	// generate y-up quads(triangle strip)
+	uint curIndex = id.x + id.y * uNumTrails;
+	uint totalParticles = uNumRibbons * uNumTrails;
+	
+	uint vertIndex = curIndex * 2;
+	
+	float3 vert_l = p.pos - float3(p.scale, 0, 0);
+	float3 vert_r = p.pos + float3(p.scale, 0, 0);
+	float3 norm = float3(0, 1, 0);
+	float texCoord = (float)id.y / (float)uNumTrails;
+	
+	oVert[uint2(vertIndex, 0)] = float4(vert_l, 0);
+	oNorm[uint2(vertIndex, 0)] = float4(norm, 0);
+	oTexCoord[uint2(vertIndex, 0)] = float4(0, texCoord, 0, 0);
+
+	vertIndex++;
+
+	oVert[uint2(vertIndex, 0)] = float4(vert_r, 0);
+	oNorm[uint2(vertIndex, 0)] = float4(norm, 0);
+	oTexCoord[uint2(vertIndex, 0)] = float4(1, texCoord, 0, 0);
+
+	if (curIndex > 0)
+	{
+		uint triIndex = (curIndex - 1) * 6;
+		
+		oTri[uint2(triIndex++, 0)] = float4(0, 0, 0, 0);
+		oTri[uint2(triIndex++, 0)] = float4(2, 0, 0, 0);
+		oTri[uint2(triIndex++, 0)] = float4(1, 0, 0, 0);
+
+		oTri[uint2(triIndex++, 0)] = float4(2, 0, 0, 0);
+		oTri[uint2(triIndex++, 0)] = float4(3, 0, 0, 0);
+		oTri[uint2(triIndex++, 0)] = float4(1, 0, 0, 0);
+	}
+	
+}

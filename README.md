@@ -6,7 +6,6 @@ WIP - Glitch In Boredom is a self development project to explore possible intera
 * Model's modified and rigged in Cinema4D
 * Custom spring behavior for slingshot's string
 * TODO - Glitch
-* TODO - Wall painted by remained feedback
 
 ## Reference
 
@@ -29,6 +28,8 @@ WIP - Glitch In Boredom is a self development project to explore possible intera
 * [Oculus Utilities for Unity](https://developer.oculus.com/downloads/unity/)
 * [Oculus Sample Framework for Unity 5 Project](https://developer.oculus.com/downloads/package/oculus-sample-framework-for-unity-5-project/)
 
+### gpu noise library 
+* [Noise shader library for Unity by Keijiro Takahashi](https://github.com/keijiro/NoiseShader)
 
 ## Dev Environment
 * Windows 10 / GeForce GTX 970
