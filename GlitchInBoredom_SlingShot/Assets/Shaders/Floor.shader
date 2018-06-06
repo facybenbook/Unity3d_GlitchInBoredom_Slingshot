@@ -41,7 +41,7 @@
 			o.Metallic = _Metallic;
 			o.Smoothness = _Glossiness;
 
-			float circularAlpha = 1.-pow(distance(IN.uv_MainTex.xy, float2(.5, .5)) * 2., .45);
+			float circularAlpha = 1.-pow(distance(IN.uv_MainTex.xy, float2(.5, .5)) * 2., 9.);
 
 			o.Alpha = circularAlpha;
 		}

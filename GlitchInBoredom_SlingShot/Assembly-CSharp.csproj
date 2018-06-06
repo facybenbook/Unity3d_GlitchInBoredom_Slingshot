@@ -163,7 +163,9 @@
     <Compile Include="Assets\SampleScenes\Hands\Scripts\PauseOnInputLoss.cs" />
     <Compile Include="Assets\SampleScenes\Hands\Scripts\TouchController.cs" />
     <Compile Include="Assets\Scripts\Confetti_Ribbon.cs" />
+    <Compile Include="Assets\Scripts\DebugTexture.cs" />
     <Compile Include="Assets\Scripts\Particle.cs" />
+    <Compile Include="Assets\Scripts\RibbonMesh.cs" />
     <Compile Include="Assets\Scripts\SelfCollisionCheck.cs" />
     <Compile Include="Assets\Scripts\SlingShotCtrl.cs" />
     <Compile Include="Assets\Scripts\Spring.cs" />
@@ -213,7 +215,6 @@
     <None Include="Assets\PostProcessing\Resources\Shaders\EyeAdaptation.cginc" />
     <None Include="Assets\PostProcessing\Resources\Shaders\GrainGen.shader" />
     <None Include="Assets\PostProcessing\Resources\Shaders\FXAA.shader" />
-    <None Include="Assets\Shaders\Confetti_RibbonGenerateMesh.compute" />
     <None Include="Assets\PostProcessing\Resources\Shaders\DiskKernels.cginc" />
     <None Include="Assets\PostProcessing\Resources\Shaders\DepthOfField.cginc" />
     <None Include="Assets\PostProcessing\Resources\Shaders\ScreenSpaceRaytrace.cginc" />

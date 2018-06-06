@@ -5,9 +5,20 @@ using UnityEngine;
 public class Confetti_Ribbon : MonoBehaviour {
     // cs - update point
     public ComputeShader mCs_updatePoints;
-    
+    public bool isDebug = false;
+
     private RenderTexture[] mRt_posLife, mRt_velScale;
     private RenderTexture mRt_rotDir;
+
+    public RenderTexture curPosLife
+    {
+        get { return mRt_posLife[curFrame]; }
+    }
+
+    public RenderTexture curVelScale
+    {
+        get { return mRt_velScale[curFrame]; }
+    }
 
     public bool mLaunchRibbon = false;
     private Vector3 mLaunchOrigin = Vector3.zero;
@@ -16,24 +27,17 @@ public class Confetti_Ribbon : MonoBehaviour {
 
     public float mTrailMaxLength;
 
-    // cs - generate mesh
-    public ComputeShader mCs_generateMesh;
-
-    private RenderTexture mRt_vert;
-    private RenderTexture mRt_norm;
-    private RenderTexture mRt_texCoord;
-    private RenderTexture mRt_tri;
-
     // render 
+    public Cubemap mCubeMap;
+    private RibbonMesh mRibbonMesh;
     public Shader mRibbonShader;
     private Material mRibbonMat;
-    private ComputeBuffer mDrawProcedural_args;
 
     // global
     private uint curFrame = 0;
 
-    private const int numRibbons = 16;
-    private const int numTrails = 16;
+    private const int numRibbons = 8192;
+    private const int numTrails = 64;
     private const int numParticles = numRibbons * numTrails;
     private const int numCSWorkerGroups = 8;
 
@@ -44,16 +48,11 @@ public class Confetti_Ribbon : MonoBehaviour {
     }
 	
 	void Update () {
-        if (mLaunchRibbon)
-            launchRibbon();
+        if (mLaunchRibbon && isDebug)
+            launchRibbon(Vector3.forward, Vector3.zero);
 
         updateCsBuffers();
 
-        generateMesh();
-    }
-
-    private void OnRenderObject()
-    {
         drawMesh();
 
         curFrame ^= 1;
@@ -64,11 +63,12 @@ public class Confetti_Ribbon : MonoBehaviour {
         destroyResources();
     }
 
-    void launchRibbon()
+    public void launchRibbon(Vector3 dir, Vector3 loc)
     {
-        // todo swap this to slingshot's direction
-        mLaunchDir = Vector3.forward;
-        mLaunchOrigin = Vector3.zero;
+        mLaunchRibbon = true;
+
+        mLaunchDir = dir;
+        mLaunchOrigin = loc;
 
         mLaunchSeed = new Vector3(
             Random.Range(-1f, 1f),
@@ -82,39 +82,28 @@ public class Confetti_Ribbon : MonoBehaviour {
 
     void initResources()
     {
+        // ribbon mesh
+        mRibbonMesh = new RibbonMesh(numTrails, numRibbons);
+
         // cs - update point
         mRt_posLife = new RenderTexture[2];
         mRt_velScale = new RenderTexture[2];
         for (int i = 0; i < 2; i++)
         {
-            mRt_posLife[i] = initComputeRenderTexture(numRibbons, numTrails);
-            mRt_velScale[i] = initComputeRenderTexture(numRibbons, numTrails);
+            mRt_posLife[i] = initComputeRenderTexture(numTrails, numRibbons);
+            mRt_velScale[i] = initComputeRenderTexture(numTrails, numRibbons);
         }
-        mRt_rotDir = initComputeRenderTexture(numRibbons, numTrails);
-
-        // cs - generate mesh
-        int numVert = numParticles * 2;
-        int numTri = (numParticles - 1) * 6;
-        mRt_vert = initComputeRenderTexture(numVert, 1);
-        mRt_norm = initComputeRenderTexture(numVert, 1);
-        mRt_texCoord = initComputeRenderTexture(numVert, 1);
-        mRt_tri = initComputeRenderTexture(numTri, 1);
+        mRt_rotDir = initComputeRenderTexture(numTrails, numRibbons);
 
         // render 
         mRibbonMat = new Material(mRibbonShader);
-
-        uint[] mArgs = new uint[5] { 0, 0, 0, 0, 0 };
-        mDrawProcedural_args = new ComputeBuffer(
-            1, mArgs.Length * sizeof(uint), ComputeBufferType.IndirectArguments);
-
-        mArgs[0] = (uint)numTri;
-        mArgs[1] = (uint)numVert;
-
-        mDrawProcedural_args.SetData(mArgs);
     }
 
     void destroyResources()
     {
+        //ribbon mesh
+        mRibbonMesh.destroy();
+
         // cs
         for (int i = 0; i < 2; i++)
         {
@@ -134,28 +123,6 @@ public class Confetti_Ribbon : MonoBehaviour {
         {
             mRt_rotDir.Release();
             mRt_rotDir = null;
-        }
-
-        // generate mesh
-        if(mRt_vert)
-        {
-            mRt_vert.Release();
-            mRt_vert = null;
-        }
-        if (mRt_norm)
-        {
-            mRt_norm.Release();
-            mRt_norm = null;
-        }
-        if (mRt_texCoord)
-        {
-            mRt_texCoord.Release();
-            mRt_texCoord = null;
-        }
-        if (mRt_tri)
-        {
-            mRt_tri.Release();
-            mRt_tri = null;
         }
 
         // gss
@@ -180,24 +147,18 @@ public class Confetti_Ribbon : MonoBehaviour {
         // cs - point
         int kernel = mCs_updatePoints.FindKernel("SetupRibbon");
 
-        mCs_updatePoints.SetTexture(kernel, "oPosLife", mRt_posLife[curFrame^1]);
-        mCs_updatePoints.SetTexture(kernel, "oVelScale", mRt_velScale[curFrame^1]);
+        mCs_updatePoints.SetTexture(kernel, "oPosLife", mRt_posLife[curFrame ^ 1]);
+        mCs_updatePoints.SetTexture(kernel, "oVelScale", mRt_velScale[curFrame ^ 1]);
         mCs_updatePoints.SetTexture(kernel, "oRotDir", mRt_rotDir);
 
-        mCs_updatePoints.Dispatch(kernel, numRibbons / numCSWorkerGroups, numTrails / numCSWorkerGroups, 1);
+        mCs_updatePoints.Dispatch(
+            kernel, numTrails / numCSWorkerGroups, numRibbons / numCSWorkerGroups, 1);
 
-        // cs - meshgen
-        kernel = mCs_generateMesh.FindKernel("InitMesh");
+        mCs_updatePoints.SetTexture(kernel, "oPosLife", mRt_posLife[curFrame]);
+        mCs_updatePoints.SetTexture(kernel, "oVelScale", mRt_velScale[curFrame]);
 
-        mCs_generateMesh.SetTexture(kernel, "oVert", mRt_vert);
-        mCs_generateMesh.SetTexture(kernel, "oNorm", mRt_norm);
-        mCs_generateMesh.SetTexture(kernel, "oTexCoord", mRt_texCoord);
-        mCs_generateMesh.SetTexture(kernel, "oTri", mRt_tri);
-
-        mCs_generateMesh.SetInt("uNumRibbons", numRibbons);
-        mCs_generateMesh.SetInt("uNumTrails", numTrails);
-
-        mCs_generateMesh.Dispatch(kernel, numRibbons / numCSWorkerGroups, numTrails / numCSWorkerGroups, 1);
+        mCs_updatePoints.Dispatch(
+            kernel, numTrails / numCSWorkerGroups, numRibbons / numCSWorkerGroups, 1);
     }
 
     void updateCsBuffers()
@@ -208,53 +169,32 @@ public class Confetti_Ribbon : MonoBehaviour {
         mCs_updatePoints.SetTexture(kernel, "oVelScale", mRt_velScale[curFrame]);
         mCs_updatePoints.SetTexture(kernel, "oRotDir", mRt_rotDir);
 
-        mCs_updatePoints.SetTexture(kernel, "uPosLife", mRt_posLife[curFrame^1]);
+        mCs_updatePoints.SetTexture(kernel, "uPosLife", mRt_posLife[curFrame ^ 1]);
         mCs_updatePoints.SetTexture(kernel, "uVelScale", mRt_velScale[curFrame ^ 1]);
 
         mCs_updatePoints.SetBool("uLaunchRibbon", mLaunchRibbon);
-
         mCs_updatePoints.SetFloat("uTrailMaxLength", mTrailMaxLength);
+        mCs_updatePoints.SetFloat("uFrame", Time.frameCount);
 
-        mCs_updatePoints.SetInt("uNumTrails", numTrails);
-
-        mCs_updatePoints.Dispatch(kernel, numRibbons / numCSWorkerGroups, numTrails / numCSWorkerGroups, 1);
+        mCs_updatePoints.Dispatch(
+            kernel, numTrails / numCSWorkerGroups, numRibbons / numCSWorkerGroups, 1);
 
         mLaunchRibbon = false;
     }
 
-    void generateMesh()
-    {
-        int kernel = mCs_generateMesh.FindKernel("GenerateMesh");
-
-        mCs_generateMesh.SetTexture(kernel, "oVert", mRt_vert);
-        mCs_generateMesh.SetTexture(kernel, "oNorm", mRt_norm);
-        mCs_generateMesh.SetTexture(kernel, "oTexCoord", mRt_texCoord);
-        mCs_generateMesh.SetTexture(kernel, "oTri", mRt_tri);
-
-        mCs_generateMesh.SetTexture(kernel, "uPosLife", mRt_posLife[curFrame]);
-        mCs_generateMesh.SetTexture(kernel, "uVelScale", mRt_velScale[curFrame]);
-        mCs_generateMesh.SetTexture(kernel, "uRotDir", mRt_rotDir);
-
-        mCs_generateMesh.SetInt("uNumRibbons", numRibbons);
-        mCs_generateMesh.SetInt("uNumTrails", numTrails);
-
-        mCs_generateMesh.Dispatch(kernel, numRibbons / numCSWorkerGroups, numTrails / numCSWorkerGroups, 1);
-    }
-
     void drawMesh()
     {
-        mRibbonMat.SetPass(0);
-
-        mRibbonMat.SetTexture("uVert", mRt_vert);
-        mRibbonMat.SetTexture("uNorm", mRt_norm);
-        mRibbonMat.SetTexture("uTexCoord", mRt_texCoord);
-        mRibbonMat.SetTexture("uTri", mRt_texCoord);
-
         mRibbonMat.SetTexture("uPosLife", mRt_posLife[curFrame]);
         mRibbonMat.SetTexture("uVelScale", mRt_velScale[curFrame]);
         mRibbonMat.SetTexture("uRotDir", mRt_rotDir);
+        mRibbonMat.SetTexture("uCubeMap", mCubeMap);
 
-        Graphics.DrawProceduralIndirect(
-            MeshTopology.Triangles, mDrawProcedural_args, 0);
+        mRibbonMat.SetInt("uNumTrails", numTrails);
+
+        Graphics.DrawMesh(
+            mRibbonMesh.getMesh(), 
+            Vector3.zero, 
+            Quaternion.identity, 
+            mRibbonMat, 0);
     }
 }

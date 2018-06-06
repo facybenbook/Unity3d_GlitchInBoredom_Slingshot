@@ -5,7 +5,9 @@ WIP - Glitch In Boredom is a self development project to explore possible intera
 ## Process
 * Model's modified and rigged in Cinema4D
 * Custom spring behavior for slingshot's string
-* TODO - Glitch
+* Confetti meshes are in a pre-defined single large mesh
+* Confetti's joint points are computed in compute shader 
+* Confetti's meshes are controlled in vertex shader with computed joint points  
 
 ## Reference
 

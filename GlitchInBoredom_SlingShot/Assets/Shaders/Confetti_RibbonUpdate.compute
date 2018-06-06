@@ -15,7 +15,7 @@ float3 uLaunchOrigin;
 float3 uLaunchDir;
 float3 uLaunchSeed;
 float uTrailMaxLength;
-int uNumTrails;
+float uFrame;
 
 struct Particle 
 {
@@ -26,13 +26,21 @@ struct Particle
 	float4 rotDir;
 };
 
-void launchRibbon(inout float3 pos, inout float3 vel, inout float life, inout float scale, in bool isHead) 
+void launchRibbon(in float3 id, inout float3 pos, inout float3 vel, inout float life, inout float scale, in bool isHead)
 {
-	pos = uLaunchOrigin + uLaunchSeed * .01;
-	vel = normalize(uLaunchDir * 2. + uLaunchSeed * .1);
-	vel *= isHead ? 3. : 1.;
-	life = 10.;
-	scale = isHead ? 3. : 1.;
+	float4 n = snoise_grad(uLaunchSeed * 123. + (float3)id/uLaunchSeed * 456.);
+	pos = uLaunchOrigin + n.xyz * .01;
+		
+	vel = normalize(uLaunchDir * 6. + n.xyz * 1.) * .3 * (n.w + 1.);
+
+	life = 500.;
+	scale = .002;// *abs(n.w);
+
+	if (isHead)
+	{
+		vel *= 3.;
+		scale = .05 + abs(n.w) * .1;
+	}
 }
 
 void calcPullingForce(inout float3 pos, in float3 pullPos)
@@ -43,8 +51,14 @@ void calcPullingForce(inout float3 pos, in float3 pullPos)
 
 	if (dist > uTrailMaxLength)
 	{
-		pos += dir * (dist - uTrailMaxLength);
+		pos += dir * (dist - uTrailMaxLength) * .5;
 	}
+}
+
+void addTurbulence(inout float3 pos, in float3 vel, in float scale, in float life) 
+{
+	float4 n = snoise_grad(pos * 3. + uFrame*.001);
+	pos += normalize(pos * vel) * n.xyz * .4 * scale;// *(1. - clamp(life, 0., 1.));
 }
 
 void calcRotDir(inout float4 rotDir, in float3 pos, in float3 pPos)
@@ -53,7 +67,7 @@ void calcRotDir(inout float4 rotDir, in float3 pos, in float3 pPos)
 	rotDir = float4(dir, 1.);
 }
 
-void kill(uint3 id)
+void kill(uint3 id) 
 {
 	oPosLife[id.xy] = float4(0., 0., 0., 0.);
 	oVelScale[id.xy] = float4(0., 0., 0., 0.);
@@ -72,41 +86,51 @@ void UpdateRibbon(uint3 id : SV_DispatchThreadID)
 	Particle p;
 
 	float4 d = uPosLife.Load(id, 0);
+	
 	float3 pPos = d.xyz;
 	p.pos = pPos;
 	p.life = d.w;
+	
 	d = uVelScale.Load(id, 0);
 	p.vel = d.xyz;
 	p.scale = d.w;
-
-	if (p.life < 0.1)
-	{
-		kill(id);
-		return;
-	}
 
 	// launch
 	if (uLaunchRibbon)
 	{
 		// head
-		if (id.y == 0)
-			launchRibbon(p.pos, p.vel, p.life, p.scale, true);
+		if (id.x == 0)
+			launchRibbon(id, p.pos, p.vel, p.life, p.scale, true);
 		else
-			launchRibbon(p.pos, p.vel, p.life, p.scale, false);
+			launchRibbon(id, p.pos, p.vel, p.life, p.scale, false);
 	}
+
+	if (p.life < .001)
+	{
+		kill(id);
+
+		return;
+	}	
 	
 	// pulling force
-	if (id.y != 0)
+	if (id.x > 0)
 	{
-		float3 pullPos = uPosLife.Load(id, 0).xyz;
+		uint3 coords = id;
+		coords.x -= 1;
+		float3 pullPos = uPosLife.Load(coords, 0).xyz;
 		calcPullingForce(p.pos, pullPos);
-	}
+
+		// update rotation vector
+		calcRotDir(p.rotDir, p.pos, pullPos);
+	} 
+	else 
+		calcRotDir(p.rotDir, p.pos, pPos);
+
+	// tubulence
+	addTurbulence(p.pos, p.vel, p.scale, p.life);
 
 	// gravity
-	p.vel -= .0098 * p.scale;
-
-	// clamp vel
-	p.vel = length(p.vel) > .1 ? normalize(p.vel) * .1 : p.vel;
+	p.vel.y -= .0198 * p.scale;
 
 	// damping
 	p.vel *= .96;
@@ -116,10 +140,7 @@ void UpdateRibbon(uint3 id : SV_DispatchThreadID)
 	p.pos += p.vel * timeStep;
 
 	// update life
-	p.life -= 0.1;
-
-	// update rotation vector
-	calcRotDir(p.rotDir, p.pos, pPos);
+	p.life *= .98;
 
 	oPosLife[id.xy] = float4(p.pos, p.life);
 	oVelScale[id.xy] = float4(p.vel, p.scale);

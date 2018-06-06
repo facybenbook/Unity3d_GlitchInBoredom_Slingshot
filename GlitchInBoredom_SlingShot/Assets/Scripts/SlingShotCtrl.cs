@@ -8,6 +8,7 @@ public class SlingShotCtrl : MonoBehaviour
     public Transform mHead_L, mHead_R;
     public Transform mHead_lookAt;
     private bool isHeadGrabbed = false;
+    private bool wasHeadGrabbed = false;
     public Transform[] mLJoints, mRJoints;
     private int numJoints;
     private Vector3 pHeadPosition;
@@ -32,64 +33,67 @@ public class SlingShotCtrl : MonoBehaviour
     void Update()
     {
         updateSpring();
-        TODO_fixPoint();
+        updateHead();
+        fixAnchor();
 
         updateJoint();
 
         pHeadPosition = mHeadPoint.position;
     }
 
-    void TODO_fixPoint()
+    void fixAnchor()
     {
         // fix anchor points to slingshot's body 
         mLPoints[0].position = mLJoints[0].position;
         mRPoints[0].position = mRJoints[0].position;
+    }
 
-        // calc head's drag force
+    void updateHead()
+    {
         {
-            Vector3 dir = pHeadPosition - mHeadPoint.position;
-            float mag = dir.magnitude;
-            dir.Normalize();
+            //calc head's positional delta force
+            {
+                Vector3 dir = pHeadPosition - mHeadPoint.position;
+                float mag = dir.magnitude;
+                dir.Normalize();
 
-            Vector3 f = dir * mag * 10f;
-            mHeadPoint.applyForce(f);
+                Vector3 f = dir * mag * 20f;
+                mHeadPoint.applyForce(f);
 
-            // update shader event
-            float illum = mag * 200f;
-            mHead.GetComponent<MeshRenderer>().sharedMaterial.SetFloat("_Emission", illum);
-            mHead.GetComponent<MeshRenderer>().sharedMaterial.SetVector("_EmissionColor", f);
-        }
+                // update shader event
+                float illum = mag * 200f;
+                mHead.GetComponent<MeshRenderer>().sharedMaterial.SetFloat("_Emission", illum);
+                mHead.GetComponent<MeshRenderer>().sharedMaterial.SetVector("_EmissionColor", f);
+            }
 
-        // clamp headpoint's total length
-        {
-            //float totalLength = mSpringMaxLength * numJoints;
-            //Vector3 dir = mHeadPoint.position - mLJoints[0].position;
-            //float length = dir.magnitude;
-            //if (length > totalLength)
-            //{
-            //    dir.Normalize();
-            //    mHeadPoint.position = mLJoints[0].position + dir * totalLength;
-            //}
-            //dir = mHeadPoint.position - mRJoints[0].position;
-            //length = dir.magnitude;
-            //if (length > totalLength)
-            //{
-            //    dir.Normalize();
-            //    mHeadPoint.position = mRJoints[0].position + dir * totalLength;
-            //}
-        }
+            // apply head point to head object
+            isHeadGrabbed = mHead.GetComponent<SelfCollisionCheck>().checkCollision;
 
+            if (!isHeadGrabbed)
+            {
+                // update slingshot event
+                if (wasHeadGrabbed)
+                {
+                    Vector3 dir = mHead_lookAt.position - mHeadPoint.position;
+                    float dist = dir.magnitude;
+                    dir.Normalize();
 
-        // apply head point to head object
-        isHeadGrabbed = mHead.GetComponent<SelfCollisionCheck>().checkCollision;
+                    if (dist > 0.3f)
+                    {
+                        GetComponent<Confetti_Ribbon>().launchRibbon(
+                            dir, mHeadPoint.position + dir * 0.5f);
+                    }
+                }
+                wasHeadGrabbed = false;
 
-        if (!isHeadGrabbed)
-        {
-            mHead.transform.position = mHeadPoint.position;
-        }
-        else
-        {
-            mHeadPoint.position = mHead.transform.position;
+                mHead.transform.position = mHeadPoint.position;
+
+            }
+            else
+            {
+                mHeadPoint.position = mHead.transform.position;
+                wasHeadGrabbed = true;
+            }
         }
 
         // update head rotation
